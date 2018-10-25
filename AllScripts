@@ -1,0 +1,299 @@
+## Various scripts I have within a text file ##
+
+- SQL file Reference
+logparser file:XXXXX.sql
+--How to get Current date of logfile when on server.
+for /f "tokens=1-5 delims=/ " %%d in ("%date%") do set logfile=u_ex17%%e%%f.log
+
+# Merge several log files into one log file for parsing. 
+LogParser.exe -i:w3c "select * into E:\logs\merged.log from E:\logs\WEB35\*, E:\logs\WEB36\*, E:\logs\WEB37\*" -o:w3c
+ - Merge removing unwanted bots or traffic
+LogParser.exe -i:w3c "Select * into 'C:\Temp\Log-Merge\merged_nobots.log' from E:\logs\WEB35\*, E:\logs\WEB36\*, E:\logs\WEB37\* where cs(User-Agent) NOT LIKE '%googlebot%' OR cs(User-Agent) NOT LIKE '%BING%' OR cs(User-Agent) NOT LIKE '%bot%' OR c-ip NOT LIKE '1.2.3.*' or c-ip NOT LIKE '4.5.6.*' or c-ip NOT LIKE '7.8.9.10'" -o:w3c
+
+
+
+################# IP start and stop time - Finding bot hits ##############
+Logparser -i:w3c "SELECT c-ip, cs(User-Agent), COUNT(*) AS Requests, MIN(TO_LOCALTIME(TO_TIMESTAMP(date, time))) AS FirstDate, MAX(TO_LOCALTIME(TO_TIMESTAMP(date, time))) AS LastDate INTO C:\Temp\GeneralResults\bot-hits.csv FROM E:\logs\WEB35\*, E:\logs\WEB36\*, E:\logs\WEB37\* WHERE TO_LOWERCASE(cs(User-Agent)) LIKE '%%bot%%' GROUP BY  c-ip, cs(User-Agent) ORDER BY FirstDate desc" -o:csv
+
+
+################################################ CHARTS ################################################
+LogParser "SELECT sc-status, COUNT(*) AS Times INTO Chart.gif FROM E:\logs\WEB35\* GROUP BY sc-status ORDER BY Times DESC" -chartType:PieExploded3D -chartTitle:"Status Codes"
+
+#####****PieExplode 3D Graph****######
+LogParser -i:w3c -o:chart "SELECT sc-status, COUNT(*) AS TotalHits INTO 'C:\temp\Errors.gif' FROM '[Logfilepath]' WHERE cs(User-Agent) NOT LIKE '%bingbot%' OR cs(User-Agent) NOT LIKE '%bot%' GROUP BY sc-status ORDER BY TotalHits DESC" -chartType:PieExploded3D -chartTitle:"Status Codes"
+
+####### Tested and worked at the time #############
+LogParser -i:w3c -o:chart "SELECT s-ip, sc-status, COUNT(*) AS Times INTO C:\temp\errors.gif FROM '[Logfilepath]' GROUP BY s-ip, sc-status ORDER BY Times DESC" -chartType:PieExploded3D -chartTitle:"Status Codes"
+
+#####/*Chart-Working-*Browser types script* /#####
+logparser -i:w3c -o:chart -chartType:barstacked "SELECT CASE strcnt(cs(user-agent),'Firefox') when 1 THEN 'Firefox' else case strcnt(cs(user-agent),'netscape') when 1 THEN 'netscape' else case strcnt(cs(user-agent),'AOL') when 1 THEN 'AOL' else case strcnt(cs(user-agent),'Opera') when 1 THEN 'Opera' else case strcnt(cs(user-agent),'Chrome') when 1 THEN 'Chrome' else case strcnt(cs(user-agent),'Mobile') when 1 THEN 'SmartPhone' else case strcnt(cs(user-agent),'Safari') when 1 THEN 'Safari' else case strcnt(cs(user-agent),'MSIE+5') when 1 THEN 'IE 5' else case strcnt(cs(user-agent),'MSIE+6') when 1 THEN 'IE 6' else case strcnt(cs(user-agent),'MSIE+7') when 1 THEN 'IE 7' else case strcnt(cs(user-agent),'MSIE+8') when 1 THEN 'IE 8' else case strcnt(cs(user-agent),'MSIE') when 1 THEN 'IE other' else case strcnt(cs(user-agent),'+rv:11.0') when 1 THEN 'IE 11' else case strcnt(cs(user-agent),'bot') when 1 THEN 'Bot' else case strcnt(cs(user-agent),'spider') when 1 THEN 'spider' else case strcnt(cs(user-agent),'PutHTTP') when 1 THEN 'PutHTTP' else case strcnt(cs(user-agent),'Mozilla/4.0') when 1 THEN 'Mozilla/4.0 other' else case strcnt(cs(user-agent),'Edge/') when 1 THEN 'Edge' ELSE 'Unknown' End End End End End End End End End End End End End End End End End End as Browser, COUNT(cs(User-Agent)) as Hits INTO Browsers.jpg FROM '[Logfilepath]' GROUP BY Browser ORDER BY Hits ASC"
+*end */
+
+##### - PieExploded - #####
+LogParser "SELECT EXTRACT_EXTENSION(cs-uri-stem) AS Extension,
+MUL(PROPSUM(sc-bytes),100.0) AS Bytes INTO Pie.gif FROM <1> GROUP BY
+Extension ORDER BY Bytes DESC" -chartType:PieExploded -chartTitle:"Bytes per
+extension" -categories:off
+
+##### - BAR CHART - ####
+logparser.exe file:..\input\WebStats_Urls_All.sql?DIRECTORY=temp_combined+FILE=Hits_Combined -i:CSV -headerRowFF -o:CHART -chartType:Bar3D -chartTitle:"URLs - All URLs, All Time" -e:10
+
+- WebStats_Urls_All.sql
+SELECT
+  Field2 AS URL,
+  SUM(Field4) AS Hits
+ INTO ..\output\%DIRECTORY%\Urls_All.gif
+ FROM ..\data\%FILE%.csv
+ GROUP BY
+  URL
+ ORDER BY
+  Hits DESC
+
+
+##/*--Search for stuff in -particluar folder-------*\##
+
+SELECT TO_TIMESTAMP(date, time) AS utc-timestamp, TO_LOCALTIME(utc-timestamp) AS local-timestamp, c-ip as [Machine], REVERSEDNS(c-ip) As [Name], cs-uri-query, cs-method, cs-uri-stem, sc-status, cs(User-Agent), cs(Referer) FROM '[LOGFILEPATH]' WHERE cs-uri-stem like '%DIRECTORY_NAME%'
+
+##/*Hits to a particular page group by IP method url sc-status and agent*\##
+
+SELECT date, c-ip, s-ip, cs-method, cs-uri-stem, sc-status, cs(User-Agent), cs(Referer), COUNT(*) AS Total FROM '[LOGFILEPATH]' WHERE cs-uri-stem LIKE '%KEYWORD%' GROUP by date, c-ip, s-ip, cs-method, cs-uri-stem, sc-status, cs(User-Agent), cs(Referer)
+
+
+##/* Error Codes status *\##
+
+SELECT sc-status, COUNT(*) AS Times INTO 'C:\temp\Status-Errors.csv' FROM '[LOGFILEPATH]' GROUP BY sc-status ORDER BY Times DESC
+
+
+## /* Time Taken for Requests by URI with more than 10 request *\##
+
+    logparser "SELECT top 80 QUANTIZE(TO_TIMESTAMP(date, time), 3600) as Hour, TO_LOWERCASE(STRCAT(‘/’,EXTRACT_TOKEN(cs-uri-stem,1,’/’))) as URI, COUNT(*) AS RequestsPerHour, SUM(sc-bytes) AS TotBytesSent, AVG(sc-bytes) AS AvgBytesSent, Max(sc-bytes) AS MaxBytesSent, ADD(1,DIV(Avg(time-taken),1000)) AS AvgTime, ADD(1,DIV(MAX(time-taken),1000)) AS MaxTime FROM [LOGFILEPATH] GROUP BY Hour, URI Having RequestsPerHour > 10 ORDER BY RequestsPerHour ASC"
+
+	
+## /* Hourly Bandwidth (chart) *\##
+
+    logparser "Select TO_LOCALTIME(QUANTIZE(TO_TIMESTAMP(date, time), 3600)) As Hour, Div(Sum(cs-bytes),1024) As Incoming(K), Div(Sum(sc-bytes),1024) As Outgoing(K) Into BandwidthByHour.gif From '[LOGFILEPATH]' Group By Hour"
+
+##/* percentages of browser type *\##
+	
+	logparser "SELECT TO_INT(MUL(100.0,PROPCOUNT(*))) AS Percent,  COUNT(*) AS Hits, cs(User-Agent) as Browser INTO C:\Temp\UseragentsHits.txt FROM '[LOGFILEPATH]' GROUP BY Browser ORDER BY HITS DESC "
+
+##/* show the number of hits for each day for each file extension --PDF--DOC--ASPX etc. *\##
+
+	SELECT TO_STRING(TO_TIMESTAMP(date, time), 'yyyy-MM-dd''hh:ss') AS Day,
+	cs-uri-stem, COUNT(*) AS Total
+	FROM '[LOGFILEPATH]' WHERE (sc-status<400 or sc-status>=500) AND (TO_LOWERCASE(cs-uri-stem)
+	LIKE '%.pdf%' OR TO_LOWERCASE(cs-uri-stem) LIKE '%.xls%') GROUP BY Day,
+	cs-uri-stem ORDER BY cs-uri-stem, Day
+	'[OUTFILEPATH]\April-100.CSV' 
+
+
+##/* Find links like a given keyword *\##
+	select * from '[LOGFILEPATH]' where cs-uri-stem like '%Example_2005_We_ARE_COOL.pdf%' AND cs-uri-stem like '%keyword%'
+
+
+##/* Directory Access Report - SQL File *\##
+	LogParser -i:IISW3c -e:-1 file:C:\Temp\directory_access.sql?Year=%YEAR%+Month=%MONTH%+Day=%DAY% -o:csv >> C:\Temp\LOG_%YEAR%%MONTH%%DAY%.log
+
+
+
+##/* Find Hits on all .aspx pages *\##
+logparser -i:w3c -o:csv "select * into OUTPUT.CSV from D:\Sysadmins\Logs_app_imercer\usfklas100\imercer.com\W3SVC952065314\ex150224.log where cs-uri-stem like '*.aspx'"
+**end**/
+
+
+#####/*Find a specific user agent (whitehat, qualys, dejaclick, etc..)*\####
+Select TO_STRING(TO_LOCALTIME(TO_TIMESTAMP(date, time)), 'yyyy-MM-dd') AS [Day], C-ip, s-ip, cs-uri-query, cs-uri-stem, cs(user-agent) from '[LOGFILEPATH]' where TO_LOWERCASE(cs(user-agent)) like '%bot%' group by day, c-ip,s-ip,cs-uri-query, cs-uri-stem, cs(user-agent) order by day
+
+
+
+/*-Working-*Browser by UserAgent -like %chrome% - script* /
+
+logparser -i:IISW3C  "SELECT DISTINCT cs(User-Agent) AS browsers, COUNT(s-ip) as Hits into c:\temp\chrome.csv FROM '[LOGFILEPATH]' WHERE cs(User-Agent) LIKE '%chrome%' GROUP by browsers ORDER by Hits DESC" -o:csv
+
+
+
+
+/**Browser types script* /
+logparser -i:w3c "SELECT CASE strcnt(cs(user-agent),'Firefox') when 1 THEN 'Firefox' else case strcnt(cs(user-agent),'netscape') when 1 THEN 'netscape' else case strcnt(cs(user-agent),'AOL') when 1 THEN 'AOL' else case strcnt(cs(user-agent),'Opera') when 1 THEN 'Opera' else case strcnt(cs(user-agent),'Chrome') when 1 THEN 'Chrome' else case strcnt(cs(user-agent),'Mobile') when 1 THEN 'SmartPhone' else case strcnt(cs(user-agent),'Safari') when 1 THEN 'Safari' else case strcnt(cs(user-agent),'MSIE+5') when 1 THEN 'IE 5' else case strcnt(cs(user-agent),'MSIE+6') when 1 THEN 'IE 6' else case strcnt(cs(user-agent),'MSIE+7') when 1 THEN 'IE 7' else case strcnt(cs(user-agent),'MSIE+8') when 1 THEN 'IE 8' else case strcnt(cs(user-agent),'MSIE') when 1 THEN 'IE other' else case strcnt(cs(user-agent),'+rv:11.0') when 1 THEN 'IE 11' else case strcnt(cs(user-agent),'bot') when 1 THEN 'Bot' else case strcnt(cs(user-agent),'spider') when 1 THEN 'spider' else case strcnt(cs(user-agent),'PutHTTP') when 1 THEN 'PutHTTP' else case strcnt(cs(user-agent),'Mozilla/4.0') when 1 THEN 'Mozilla/4.0 other' else case strcnt(cs(user-agent),'Edge/') when 1 THEN 'Edge' ELSE 'Unknown' End End End End End End End End End End End End End End End End End End as Browser, COUNT(cs(User-Agent)) as Hits INTO Browsers.jpg FROM c:\Temp\Log-Merge\eprism-merged.log GROUP BY Browser ORDER BY Hits ASC"
+*/
+
+/* ALL the Browswer types used * /
+
+SELECT  
+    distinct cs(User-Agent), 
+    count(*) as hits 
+    INTO c:\Temp\Results\useragentsalltypes.csv 
+FROM  
+    C:\Temp\Log-Merge\merged.log
+GROUP BY 
+    cs(user-agent) 
+ORDER BY  
+    hits 
+DESC
+
+*/
+
+/* Browser Types script** /
+
+
+select distinct
+case strcnt(cs(user-agent),'Chrome') when 1 THEN 'Chrome'
+else case strcnt(cs(user-agent),'Firefox') when 1 THEN 'Firefox'
+else case strcnt(cs(user-agent),'MSIE+6') when 1 THEN 'IE 6'
+else case strcnt(cs(user-agent),'MSIE+7') when 1 THEN 'IE 7'
+else case strcnt(cs(user-agent),'MSIE+8') when 1 THEN 'IE 8'
+else case strcnt(cs(user-agent),'MSIE+9') when 1 THEN 'IE 9'
+else case strcnt(cs(user-agent),'MSIE+10') when 1 THEN 'IE 10'
+else case strcnt(cs(user-agent),'IE+11') when 1 THEN 'IE 11'
+else case strcnt(cs(user-agent),'+rv:11') when 1 THEN 'IE 11'
+else case strcnt(cs(user-agent),'Opera') when 1 THEN 'Opera'
+else case strcnt(cs(user-agent),'Safari/') when 1 THEN 'Safari'
+else case strcnt(cs(user-agent),'iPhone+OS+5') when 1 THEN 'Safari'
+else case strcnt(cs(user-agent),'iPhone+OS+6') when 1 THEN 'Safari'
+else case strcnt(cs(user-agent),'iPhone+OS+7') when 1 THEN 'Safari'
+else case strcnt(cs(user-agent),'CPU+OS+6') when 1 THEN 'Safari'
+else case strcnt(cs(user-agent),'iTunes/11') when 1 THEN 'iTunes'
+else case strcnt(cs(user-agent),'iTunes/10') when 1 THEN 'iTunes'
+else 'Unknown'
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+as Browser,COUNT(c-ip) as Hits FROM '[LOGFILEPATH]' 
+
+ ** Dont display any cs(User-Agent) which are created by Bots *
+
+ WHERE cs(User-Agent) NOT LIKE '%Java%' 
+ AND cs(User-Agent) NOT LIKE '%moodle%'
+ AND cs(User-Agent) NOT LIKE '%twitter%'
+ AND cs(User-Agent) NOT LIKE '%mymmu%'
+ AND cs(User-Agent) NOT LIKE '%MMU%'
+ AND cs(User-Agent) NOT LIKE '%admant%'
+ AND cs(User-Agent) NOT LIKE '%contextAd%'
+ AND cs(User-Agent) NOT LIKE '%bingbot%' 
+ AND cs(User-Agent) NOT LIKE '%genieo%'
+ AND cs(User-Agent) NOT LIKE '%proximic%'
+ AND cs(User-Agent) NOT LIKE '%PageBot%'
+ AND cs(User-Agent) NOT LIKE '%feedfetcher%'
+ AND cs(User-Agent) NOT LIKE '%wordpress%'
+ AND cs(User-Agent) NOT LIKE '%PictureBot%'
+ AND cs(User-Agent) NOT LIKE '%WeSEE%'
+ AND cs(User-Agent) NOT LIKE '%Sogou%'
+ AND cs(User-Agent) NOT LIKE '%msnbot%'
+ AND cs(User-Agent) NOT LIKE '%Mediapartner%'
+ AND cs(User-Agent) NOT LIKE '%MagpieRSS%'
+ AND cs(User-Agent) NOT LIKE '%Affectv%'
+ AND cs(User-Agent) NOT LIKE '%Nutch%'
+ AND cs(User-Agent) NOT LIKE '%SkimBot%'
+ AND cs(User-Agent) NOT LIKE '%WhatWeb%'
+ AND cs(User-Agent) NOT LIKE '%Googlebot%'
+ AND cs(User-Agent) NOT LIKE '%Yahoo%'
+ AND cs(User-Agent) NOT LIKE '%Netcraft%'
+ AND cs(User-Agent) NOT LIKE '%AhrefsBot%'
+ AND cs(User-Agent) NOT LIKE '%SemrushBot%'
+ AND cs(User-Agent) NOT LIKE '%MJ12bot%'
+ AND cs(User-Agent) NOT LIKE '%DotBot%'
+ AND cs(User-Agent) NOT LIKE '%Vagabondo%'
+ AND cs(User-Agent) NOT LIKE '%NetSeer%'
+ AND cs(User-Agent) NOT LIKE '%PHP%' 
+
+  
+ ***** Dont display any cs(User-Agent) which has an entry of nothing ****
+ 
+  AND cs(User-Agent) is NOT NULL GROUP by Browser ORDER by Hits DESC 
+
+
+ 
+ 
+ ** end */
+
+ /* OS type used script * /
+select distinct
+case strcnt(cs(user-agent),'Android') when 1 THEN 'Android'
+else case strcnt(cs(user-agent),'Windows+NT+6.3') when 1 THEN 'Windows 8.1'
+else case strcnt(cs(user-agent),'Windows+NT+6.2') when 1 THEN 'Windows 8'
+else case strcnt(cs(user-agent),'Windows+NT+6.1') when 1 THEN 'Windows 7'
+else case strcnt(cs(user-agent),'Windows+7') when 1 THEN 'Windows 7'
+else case strcnt(cs(user-agent),'Windows+NT+6.0') when 1 THEN 'Windows Vista'
+else case strcnt(cs(user-agent),'Windows+Vista') when 1 THEN 'Windows Vista'
+else case strcnt(cs(user-agent),'Windows+NT+5.2') when 1 THEN 'Windows Server 2003 Windows XP x64 Edition'
+else case strcnt(cs(user-agent),'Windows+NT+5.1') when 1 THEN 'Windows XP'
+else case strcnt(cs(user-agent),'Windows+NT+5') when 1 THEN 'Windows 2000'
+else case strcnt(cs(user-agent),'Windows+NT+4') when 1 THEN 'Microsoft Windows NT 4.0'
+else case strcnt(cs(user-agent),'Windows+98') when 1 THEN 'Windows 98'
+else case strcnt(cs(user-agent),'Windows+95') when 1 THEN 'Windows 95'
+else case strcnt(cs(user-agent),'Windows+CE') when 1 THEN 'Windows CE'
+else case strcnt(cs(user-agent),'Darwin/14') when 1 THEN 'iOS'
+else case strcnt(cs(user-agent),'Darwin/13') when 1 THEN 'iOS'
+else case strcnt(cs(user-agent),'iPhone') when 1 THEN 'iOS-iphone'
+else case strcnt(cs(user-agent),'iPad') when 1 THEN 'iOS-ipad'
+else case strcnt(cs(user-agent),'OS+X') when 1 THEN 'Mac OSX'
+else case strcnt(cs(user-agent),'Symbian') when 1 THEN 'Symbian'
+else case strcnt(cs(user-agent),'Windows+Phone') when 1 THEN 'Windows phone'
+else case strcnt(cs(user-agent),'CrOS') when 1 THEN 'Chrome OS'
+else case strcnt(cs(user-agent),'Unix') when 1 THEN 'Unix'
+else case strcnt(cs(user-agent),'BlackBerry+') when 1 THEN 'BlackBerry'
+else case strcnt(cs(user-agent),'BB10') when 1 THEN 'BlackBerry'
+#* else case strcnt(cs(user-agent),'iTunes') when 1 THEN 'iTunes application'
+else case strcnt(cs(user-agent),'Linux') when 1 THEN 'Linux'
+ELSE 'Unknown'
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+End
+as Platform/Device,
+COUNT(c-ip) as Hits
+FROM '[LOGFILEPATH]'
+**end**/
+
+/* percentages of browser type * /
+SELECT 
+  TO_INT(MUL(100.0,PROPCOUNT(*))) AS Percent,  
+  COUNT(*) AS Hits, 
+  cs(User-Agent) as Browser 
+INTO  
+  UseragentsHits.txt 
+FROM  
+  logs\iis\ex*.log   
+GROUP BY  
+  Browser 
+ORDER BY  
+  HITS 
+DESC 
+
+** end */
